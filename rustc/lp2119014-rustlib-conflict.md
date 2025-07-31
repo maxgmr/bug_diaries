@@ -72,4 +72,49 @@ Now, let's try to update:
 apt update && apt upgrade
 ```
 
-Unfortunately, this worked perfectly!
+Unfortunately, this worked perfectly! This likely means the bug boils down to a race condition while `apt` tries to upgrade the two packages.
+
+## The Potential Solution
+
+`rust-X.Y-src.links.in` links its installed files to the versioned `rustlib` path:
+
+```
+usr/src/rustc-${env:RUST_LONG_VERSION} usr/lib/rust-${env:RUST_VERSION}/rustlib/src/rust
+usr/src/rustc-${env:RUST_LONG_VERSION} usr/lib/rust-${env:RUST_VERSION}/lib/rustlib/src/rust
+```
+
+This means that `rustc.links` already achieves the desired end result below, making `rust-src.links` superfluous:
+
+```
+/usr/lib/rust-${env:RUST_VERSION}/lib/rustlib	/usr/lib/rustlib
+```
+
+## Another Error!
+
+It turns out that `rust-src.links` is broken in more ways than one! `rust-src.links` creates a symlink to `rustc-RUST_VERSION`...
+
+```
+/usr/src/rustc-${env:RUST_VERSION} /usr/lib/rustlib/src/rust
+```
+
+...but `rust-X.Y-src.install.in` installs files to `rustc-RUST_LONG_VERSION`!
+
+```
+src             usr/src/rustc-${env:RUST_LONG_VERSION}
+...etc...
+```
+
+This means that the symlink which gets installed is actually broken _regardless_ of any package ownership conflicts.
+
+## Killing Two Birds With One Stone
+
+Both problems should be solvable by simply emptying `debian/rust-src.links`:
+
+```diff
+--- a/debian/rust-src.links
++++ b/debian/rust-src.links
+@@ -1 +0,0 @@
+-/usr/src/rustc-${env:RUST_VERSION} /usr/lib/rustlib/src/rust
+```
+
+This removes both the conflict _and_ the bad symlink.
