@@ -118,3 +118,41 @@ Both problems should be solvable by simply emptying `debian/rust-src.links`:
 ```
 
 This removes both the conflict _and_ the bad symlink.
+
+## Testing the solution
+
+Let's double-check to make sure we haven't somehow missed out on any files (although this is unlikely, considering the only thing we removed was already broken)!
+
+Control group (in an LXC container):
+
+```shell
+apt update && apt upgrade -y
+apt install rustc rust-src tree
+```
+
+Then, check the output of the following command:
+
+```shell
+tree -l /usr/lib/rustlib
+```
+
+Experimental group (also LXC):
+
+```shell
+apt update && apt upgrade -y
+add-apt-repository ppa:maxgmr/rust-defaults-lp2119014
+apt update
+apt install rustc=1.85.1ubuntu2\~ppa1 rust-src=1.85.1ubuntu2\~ppa1 tree
+```
+
+Compare with the previous output:
+
+```shell
+tree -l /usr/lib/rustlib
+```
+
+Now the symlink actually works!
+
+## Caveat
+
+Note that now, if one installs _just_ `rust-src`, there will be no `/usr/lib/rustlib`. This shouldn't break anyone's systems, though, considering the fact that this symlink was broken in the first place...
